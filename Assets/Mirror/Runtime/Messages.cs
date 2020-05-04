@@ -206,6 +206,9 @@ namespace Mirror
     {
         public uint netId;
         public bool isLocalPlayer;
+        /// <summary>
+        /// hasAuthority
+        /// </summary>
         public bool isOwner;
         public ulong sceneId;
         public Guid assetId;
