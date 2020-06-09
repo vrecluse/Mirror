@@ -140,29 +140,42 @@ namespace Mirror.Weaver
             ILProcessor worker = writerFunc.Body.GetILProcessor();
 
             uint fields = 0;
-            foreach (FieldDefinition field in variable.Resolve().Fields)
+            TypeDefinition typeDefinition = variable.Resolve();
+            while (typeDefinition != null)
             {
-                if (field.IsStatic || field.IsPrivate)
-                    continue;
-
-                if (field.IsNotSerialized)
-                    continue;
-
-                MethodReference writeFunc = GetWriteFunc(field.FieldType, recursionCount + 1);
-                if (writeFunc != null)
+                foreach (FieldDefinition field in typeDefinition.Fields)
                 {
-                    FieldReference fieldRef = Weaver.CurrentAssembly.MainModule.ImportReference(field);
+                    if (field.IsStatic || field.IsPrivate)
+                        continue;
 
-                    fields++;
-                    worker.Append(worker.Create(OpCodes.Ldarg_0));
-                    worker.Append(worker.Create(OpCodes.Ldarg_1));
-                    worker.Append(worker.Create(OpCodes.Ldfld, fieldRef));
-                    worker.Append(worker.Create(OpCodes.Call, writeFunc));
+                    if (field.IsNotSerialized)
+                        continue;
+
+                    MethodReference writeFunc = GetWriteFunc(field.FieldType, recursionCount + 1);
+                    if (writeFunc != null)
+                    {
+                        FieldReference fieldRef = Weaver.CurrentAssembly.MainModule.ImportReference(field);
+
+                        fields++;
+                        worker.Append(worker.Create(OpCodes.Ldarg_0));
+                        worker.Append(worker.Create(OpCodes.Ldarg_1));
+                        worker.Append(worker.Create(OpCodes.Ldfld, fieldRef));
+                        worker.Append(worker.Create(OpCodes.Call, writeFunc));
+                    }
+                    else
+                    {
+                        Weaver.Error($"{field.Name} has unsupported type. Use a type supported by Mirror instead", field);
+                        return null;
+                    }
                 }
-                else
+
+                try
                 {
-                    Weaver.Error($"{field.Name} has unsupported type. Use a type supported by Mirror instead", field);
-                    return null;
+                    typeDefinition = typeDefinition.BaseType.Resolve();
+                }
+                catch (System.Exception e)
+                {
+                    break;
                 }
             }
             if (fields == 0)
